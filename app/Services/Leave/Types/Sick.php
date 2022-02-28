@@ -9,11 +9,11 @@ class Sick extends Base
         return true;
     }
 
-    public function notify(): bool
+    public function notify(Notify $notify): bool
     {
-        parent::notify();
+        parent::notify($notify);
 
-        // send a email to managers
+        $notify->send();
 
         return true;
     }
