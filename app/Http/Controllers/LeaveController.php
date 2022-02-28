@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\VerifyLeaveRequest;
 use App\Services\Leave\Application as LeaveApplication;
+use App\Services\Leave\TypeFactory;
 use App\Services\Staff\Leave as StaffLeave;
 
 class LeaveController extends Controller
@@ -110,8 +111,8 @@ class LeaveController extends Controller
         int $id,
         LeaveApplication $leaveApplication,
         StaffLeave $staffLeave,
+        TypeFactory $leaveTypeFactory,
     ) {
-        $needPassProbationLeaves = ['annual', 'sick'];
         try {
             DB::beginTransaction();
 
@@ -128,9 +129,12 @@ class LeaveController extends Controller
                 return $this->apiResponse('409', "application id {$id} is not pending.", [], 409);
             }
 
-            // only the staff who after the probation can take an annual leave and sick leave
-            // 特休假和病假要通過試用期的員工才能請
-            if (in_array($application['leave_type'], $needPassProbationLeaves)) {
+            // get a leave object
+            $leaveObj = $leaveTypeFactory->create($application['leave_type']);
+
+            // check the leave whether need to pass the probation period
+            // 這個假別是否要通過試用期的員工才能請
+            if ($leaveObj->isNeedPassProbation()) {
                 if ($application['staff']['is_probation'] === true) {
                     return $this->apiResponse('409-4', "staff {$application['staff']['name']} is in probation, could not take a annual leave", [], 409);
                 }
@@ -169,15 +173,7 @@ class LeaveController extends Controller
         }
 
         try {
-            // send a email to supervisor.
-            // 寄信給主管
-
-            // if the leave needs to pass probation
-            // 如果這個假是需要過試用期才能夠請的
-            if (in_array($application['leave_type'], $needPassProbationLeaves)) {
-                // send a email to manager.
-                // 還要寄信給管理者
-            }
+            $leaveObj->notify();
         } catch (\Throwable $e) {
             Log::error('approval leave error, ' . $e->getMessage(), $request->input());
             return $this->apiResponse('500', "Internal service error", [], 500);
