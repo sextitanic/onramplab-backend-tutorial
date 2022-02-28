@@ -2,13 +2,15 @@
 
 namespace App\Services\Leave;
 
-use App\Models\LeaveApplication;
+use App\Repositories\LeaveApplicationRepository;
 
 class Application
 {
-    public function __construct()
+    protected $applicationRepo;
+
+    public function __construct(LeaveApplicationRepository $applicationRepository)
     {
-        //
+        $this->applicationRepo = $applicationRepository;
     }
 
     /**
@@ -29,7 +31,7 @@ class Application
      */
     public function getFormList(): array
     {
-        return LeaveApplication::get()->toArray();
+        return $this->applicationRepo->getList();
     }
 
     /**
@@ -57,7 +59,7 @@ class Application
      */
     public function getFormById(int $id): array
     {
-        return LeaveApplication::with('staff')->lockForUpdate()->find($id)->toArray();
+        return $this->applicationRepo->findById($id);
     }
 
     /**
@@ -72,12 +74,7 @@ class Application
     {
         // if the affected rows is 0, which means the conditions in the where clause are not sufficient
         // 如果 update 語法影響的列數是 0，代表在 where 裡面有一些判斷是不符合的
-        $affectedRows = LeaveApplication::where('id', $id)
-            ->update([
-                'status' => $status,
-                'approver' => $approverName,
-                'approval_date' => date('Y-m-d H:i:s'),
-            ]);
+        $affectedRows = $this->applicationRepo->updateStatus($id, $status, $approverName);
         return ($affectedRows === 1) ? true : false;
     }
 }

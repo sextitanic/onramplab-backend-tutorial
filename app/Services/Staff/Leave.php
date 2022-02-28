@@ -3,12 +3,15 @@
 namespace App\Services\Staff;
 
 use App\Models\StaffLeave;
+use App\Repositories\StaffLeaveRepository;
 
 class Leave
 {
-    public function __construct()
+    protected $leaveRepo;
+
+    public function __construct(StaffLeaveRepository $staffLeaveRepository)
     {
-        //
+        $this->leaveRepo = $staffLeaveRepository;
     }
 
     /**
@@ -25,11 +28,7 @@ class Leave
      */
     public function getBalance(int $staffId): array
     {
-        return StaffLeave::where('staff_id', $staffId)
-                ->where('year', date('Y'))
-                ->lockForUpdate()
-                ->first()
-                ->toArray();
+        return $this->leaveRepo->getBalance($staffId);
     }
 
     /**
@@ -42,9 +41,7 @@ class Leave
      */
     public function subtractBalance(int $staffId, string $leaveType, float $applyHours): bool
     {
-        $affectedRows = StaffLeave::where('staff_id', $staffId)
-                ->where('year', date('Y'))
-                ->decrement($leaveType, $applyHours);
+        $affectedRows = $this->leaveRepo->incrementBalance($staffId, $leaveType, -$applyHours);
         return ($affectedRows === 1) ? true : false;
     }
 }
