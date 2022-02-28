@@ -7,6 +7,7 @@ use Log;
 use Validator;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\VerifyLeaveRequest;
 use App\Models\StaffLeave;
 use App\Models\LeaveApplication;
 
@@ -34,22 +35,9 @@ class LeaveController extends Controller
         return $this->apiResponse('200', 'success', $data);
     }
 
-    public function reject(Request $request, int $id)
+    public function reject(VerifyLeaveRequest $request, int $id)
     {
-
         try {
-            // validate the parameters passed, usually, the approver should be the currently logged user
-            // 驗證傳入參數，通常那個審核的人應該直接用登入的使用者
-            $validator = Validator::make(
-                $request->all(),
-                [
-                    'approver' => 'required|string|max:45',
-                ]
-            );
-            if ($validator->fails()) {
-                return $this->apiResponse('422', 'validation failed', $validator->messages()->toArray(), 422);
-            }
-
             // get leave application
             // 取得請假單
             $application = LeaveApplication::with('staff')->find($id);
@@ -84,22 +72,9 @@ class LeaveController extends Controller
         return $this->apiResponse();
     }
 
-    public function cancel(Request $request, int $id)
+    public function cancel(VerifyLeaveRequest $request, int $id)
     {
-
         try {
-            // validate the parameters passed, usually, the approver should be the currently logged user
-            // 驗證傳入參數，通常那個審核的人應該直接用登入的使用者
-            $validator = Validator::make(
-                $request->all(),
-                [
-                    'approver' => 'required|string|max:45',
-                ]
-            );
-            if ($validator->fails()) {
-                return $this->apiResponse('422', 'validation failed', $validator->messages()->toArray(), 422);
-            }
-
             // get leave application
             // 取得請假單
             $application = LeaveApplication::with('staff')->find($id);
@@ -148,28 +123,17 @@ class LeaveController extends Controller
     }
 
     /**
-     * approve a leave application
+     * approval a leave application
      * 批准通過請假單
      *
      * @param Request $request
      * @param integer $id
      * @return json
      */
-    public function approve(Request $request, int $id)
+    public function approve(VerifyLeaveRequest $request, int $id)
     {
         try {
             DB::beginTransaction();
-            // validate the parameters passed, usually, the approver should be the currently logged user
-            // 驗證傳入參數，通常那個審核的人應該直接用登入的使用者
-            $validator = Validator::make(
-                $request->all(),
-                [
-                    'approver' => 'required|string|max:45',
-                ]
-            );
-            if ($validator->fails()) {
-                return $this->apiResponse('422', 'validation failed', $validator->messages()->toArray(), 422);
-            }
 
             // get leave application
             // 取得請假單
