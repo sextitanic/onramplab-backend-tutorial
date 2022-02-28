@@ -8,8 +8,8 @@ use Validator;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\VerifyLeaveRequest;
-use App\Models\StaffLeave;
-use App\Models\LeaveApplication;
+use App\Services\Leave\Application as LeaveApplication;
+use App\Services\Staff\Leave as StaffLeave;
 
 class LeaveController extends Controller
 {
@@ -25,22 +25,22 @@ class LeaveController extends Controller
      * @param Request $request
      * @return void
      */
-    public function index(Request $request)
+    public function index(Request $request, LeaveApplication $leaveApplication)
     {
         try {
-            $data = LeaveApplication::get()->toArray();
+            $data = $leaveApplication->getFormList();
         } catch (\Exception $e) {
             return $this->apiResponse('500', $e->getMessage(), [], 500);
         }
         return $this->apiResponse('200', 'success', $data);
     }
 
-    public function reject(VerifyLeaveRequest $request, int $id)
+    public function reject(VerifyLeaveRequest $request, int $id, LeaveApplication $leaveApplication)
     {
         try {
             // get leave application
             // 取得請假單
-            $application = LeaveApplication::with('staff')->find($id);
+            $application = $leaveApplication->getFormById($id);
             if (empty($application)) {
                 return $this->apiResponse('404', "application id {$id} not found", [], 404);
             }
@@ -58,12 +58,7 @@ class LeaveController extends Controller
 
             // update the application status to 2: rejected
             // 把請假單狀態設為 2: 不通過
-            LeaveApplication::where('id', $id)
-                ->update([
-                    'status' => self::APPLICATION_REJECTED,
-                    'approver' => $request->input('approver'),
-                    'approval_date' => date('Y-m-d H:i:s'),
-                ]);
+            $leaveApplication->setStatus($id, self::APPLICATION_REJECTED, $request->input('approver'));
         } catch (\Throwable $e) {
             Log::error('reject leave error, ' . $e->getMessage(), $request->input());
             return $this->apiResponse('500', "Internal service error", [], 500);
@@ -72,12 +67,12 @@ class LeaveController extends Controller
         return $this->apiResponse();
     }
 
-    public function cancel(VerifyLeaveRequest $request, int $id)
+    public function cancel(VerifyLeaveRequest $request, int $id, LeaveApplication $leaveApplication)
     {
         try {
             // get leave application
             // 取得請假單
-            $application = LeaveApplication::with('staff')->find($id);
+            $application = $leaveApplication->getFormById($id);
             if (empty($application)) {
                 return $this->apiResponse('404', "application id {$id} not found", [], 404);
             }
@@ -95,12 +90,7 @@ class LeaveController extends Controller
 
             // update the application status to 3: canceled
             // 把請假單狀態設為 3: 取消
-            LeaveApplication::where('id', $id)
-                ->update([
-                    'status' => self::APPLICATION_CANCELED,
-                    'approver' => $request->input('approver'),
-                    'approval_date' => date('Y-m-d H:i:s'),
-                ]);
+            $leaveApplication->setStatus($id, self::APPLICATION_CANCELED, $request->input('approver'));
         } catch (\Throwable $e) {
             Log::error('cancel leave error, ' . $e->getMessage(), $request->input());
             return $this->apiResponse('500', "Internal service error", [], 500);
@@ -130,14 +120,18 @@ class LeaveController extends Controller
      * @param integer $id
      * @return json
      */
-    public function approve(VerifyLeaveRequest $request, int $id)
-    {
+    public function approve(
+        VerifyLeaveRequest $request,
+        int $id,
+        LeaveApplication $leaveApplication,
+        StaffLeave $staffLeave,
+    ) {
         try {
             DB::beginTransaction();
 
             // get leave application
             // 取得請假單
-            $application = LeaveApplication::with('staff')->lockForUpdate()->find($id);
+            $application = $leaveApplication->getFormById($id);
             if (empty($application)) {
                 return $this->apiResponse('404', "application id {$id} not found", [], 404);
             }
@@ -163,10 +157,7 @@ class LeaveController extends Controller
 
             // get the staff's leave balance hours
             // 取得員工的剩餘請假時數
-            $staffLeaves = StaffLeave::where('staff_id', $application['staff']['id'])
-                ->where('year', date('Y'))
-                ->lockForUpdate()
-                ->first();
+            $staffLeaves = $staffLeave->getBalance($application['staff']['id']);
 
             // compare balance hours to apply hours, the balance hours should be greater than apply hours
             // 剩餘的請假時數應該要比申請的時數還多
@@ -178,27 +169,15 @@ class LeaveController extends Controller
 
             // update the application status to 1: approved
             // 把請假單狀態設為 1: 已核准
-            $affectedRows = LeaveApplication::where('id', $id)
-                ->where('status', self::APPLICATION_PENDING)
-                ->update([
-                    'status' => self::APPLICATION_APPROVED,
-                    'approver' => $request->input('approver'),
-                    'approval_date' => date('Y-m-d H:i:s'),
-                ]);
-
-            // if the affected rows is 0, which means the conditions in the where clause are not sufficient
-            // 如果 update 語法影響的列數是 0，代表在 where 裡面有一些判斷是不符合的
-            if ($affectedRows === 0) {
+            $setResult = $leaveApplication->setStatus($id, self::APPLICATION_APPROVED, $request->input('approver'));
+            if ($setResult === false) {
                 return $this->apiResponse('409-6', "the status of application id {$id} has been changed", [], 409);
             }
 
             // subtract leaves
             // 把員工的休假時數扣掉
-            $affectedRows = StaffLeave::where('staff_id', $application['staff']['id'])
-                ->where('year', date('Y'))
-                // ->where($application['leave_type'], $leaveBalanceHours)
-                ->decrement($application['leave_type'], $leaveApplyHours);
-            if ($affectedRows === 0) {
+            $subtractResult = $staffLeave->subtractBalance($application['staff']['id'], $application['leave_type'], $leaveApplyHours);
+            if ($subtractResult === false) {
                 return $this->apiResponse('409-7', "staff {$application['staff']['name']} leaves hours has been changed", [], 409);
             }
 
