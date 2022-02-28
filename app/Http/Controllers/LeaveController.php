@@ -111,6 +111,7 @@ class LeaveController extends Controller
         LeaveApplication $leaveApplication,
         StaffLeave $staffLeave,
     ) {
+        $needPassProbationLeaves = ['annual', 'sick'];
         try {
             DB::beginTransaction();
 
@@ -129,7 +130,7 @@ class LeaveController extends Controller
 
             // only the staff who after the probation can take an annual leave and sick leave
             // 特休假和病假要通過試用期的員工才能請
-            if ($application['leave_type'] === 'annual' || $application['leave_type'] === 'sick') {
+            if (in_array($application['leave_type'], $needPassProbationLeaves)) {
                 if ($application['staff']['is_probation'] === true) {
                     return $this->apiResponse('409-4', "staff {$application['staff']['name']} is in probation, could not take a annual leave", [], 409);
                 }
@@ -173,7 +174,7 @@ class LeaveController extends Controller
 
             // if the leave needs to pass probation
             // 如果這個假是需要過試用期才能夠請的
-            if ($application['leave_type'] === 'annual' || $application['leave_type'] === 'sick') {
+            if (in_array($application['leave_type'], $needPassProbationLeaves)) {
                 // send a email to manager.
                 // 還要寄信給管理者
             }
