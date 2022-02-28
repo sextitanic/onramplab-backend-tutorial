@@ -4,7 +4,7 @@ namespace App\Services\Leave\Types;
 
 class Vaccine extends Base
 {
-    public function notify()
+    public function notify(): bool
     {
         parent::notify();
 
