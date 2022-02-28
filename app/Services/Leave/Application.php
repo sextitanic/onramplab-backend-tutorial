@@ -7,6 +7,7 @@ use App\Repositories\LeaveApplicationRepository;
 class Application
 {
     protected $applicationRepo;
+    protected $applicationFormData = [];
 
     public function __construct(LeaveApplicationRepository $applicationRepository)
     {
@@ -59,7 +60,11 @@ class Application
      */
     public function getFormById(int $id): array
     {
-        return $this->applicationRepo->findById($id);
+        if (isset($this->applicationFormData[$id])) {
+            return $this->applicationFormData[$id];
+        }
+        $this->applicationFormData[$id] = $this->applicationRepo->findById($id);
+        return $this->applicationFormData[$id];
     }
 
     /**
@@ -76,5 +81,30 @@ class Application
         // 如果 update 語法影響的列數是 0，代表在 where 裡面有一些判斷是不符合的
         $affectedRows = $this->applicationRepo->updateStatus($id, $status, $approverName);
         return ($affectedRows === 1) ? true : false;
+    }
+
+    public function approve(int $id, string $approverName): bool
+    {
+        $status = config('constants.leave-application.status.approved');
+        return $this->setStatus($id, $status, $approverName);
+    }
+
+    public function reject(int $id, string $approverName): bool
+    {
+        $status = config('constants.leave-application.status.rejected');
+        return $this->setStatus($id, $status, $approverName);
+    }
+
+    public function cancel(int $id, string $approverName): bool
+    {
+        $status = config('constants.leave-application.status.canceled');
+        return $this->setStatus($id, $status, $approverName);
+    }
+
+    public function isPending(int $id): bool
+    {
+        $pendingStatus = config('constants.leave-application.status.pending');
+        $applicationForm = $this->getFormById($id);
+        return $pendingStatus === $applicationForm['status'];
     }
 }

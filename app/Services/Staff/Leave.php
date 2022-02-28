@@ -8,6 +8,7 @@ use App\Repositories\StaffLeaveRepository;
 class Leave
 {
     protected $leaveRepo;
+    protected $staffBalances = [];
 
     public function __construct(StaffLeaveRepository $staffLeaveRepository)
     {
@@ -28,7 +29,11 @@ class Leave
      */
     public function getBalance(int $staffId): array
     {
-        return $this->leaveRepo->getBalance($staffId);
+        if (isset($this->staffBalances[$staffId])) {
+            return $this->staffBalances[$staffId];
+        }
+        $this->staffBalances[$staffId] = $this->leaveRepo->getBalance($staffId);
+        return $this->staffBalances[$staffId];
     }
 
     /**
@@ -43,5 +48,15 @@ class Leave
     {
         $affectedRows = $this->leaveRepo->incrementBalance($staffId, $leaveType, -$applyHours);
         return ($affectedRows === 1) ? true : false;
+    }
+
+    public function isSufficient(int $staffId, string $leaveType, float $applyHous): bool
+    {
+        $staffBalance = $this->getBalance($staffId);
+
+        if ($staffBalance[$leaveType] < $applyHous) {
+            return false;
+        }
+        return true;
     }
 }

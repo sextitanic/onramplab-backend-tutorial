@@ -13,11 +13,6 @@ use App\Services\Staff\Leave as StaffLeave;
 
 class LeaveController extends Controller
 {
-    private const APPLICATION_PENDING = 0;
-    private const APPLICATION_APPROVED = 1;
-    private const APPLICATION_REJECTED = 2;
-    private const APPLICATION_CANCELED = 3;
-
     /**
      * get the list of the leave application
      * 取得請假單列表
@@ -47,18 +42,13 @@ class LeaveController extends Controller
 
             // if the status of the application is not 0: pending, it should return failed
             // 如果請假單的申請狀態不是 0: 待審核，那就應該回錯誤
-            switch ($application['status']) {
-                case self::APPLICATION_APPROVED:
-                    return $this->apiResponse('409-1', "application id {$id} has been approved", [], 409);
-                case self::APPLICATION_REJECTED:
-                    return $this->apiResponse('409-2', "application id {$id} has been rejected", [], 409);
-                case self::APPLICATION_CANCELED:
-                    return $this->apiResponse('409-3', "application id {$id} has been canceled", [], 409);
+            if ($leaveApplication->isPending($id) === false) {
+                return $this->apiResponse('409', "application id {$id} is not pending.", [], 409);
             }
 
             // update the application status to 2: rejected
             // 把請假單狀態設為 2: 不通過
-            $leaveApplication->setStatus($id, self::APPLICATION_REJECTED, $request->input('approver'));
+            $leaveApplication->reject($id, $request->input('approver'));
         } catch (\Throwable $e) {
             Log::error('reject leave error, ' . $e->getMessage(), $request->input());
             return $this->apiResponse('500', "Internal service error", [], 500);
@@ -79,18 +69,13 @@ class LeaveController extends Controller
 
             // if the status of the application is not 0: pending, it should return failed
             // 如果請假單的申請狀態不是 0: 待審核，那就應該回錯誤
-            switch ($application['status']) {
-                case self::APPLICATION_APPROVED:
-                    return $this->apiResponse('409-1', "application id {$id} has been approved", [], 409);
-                case self::APPLICATION_REJECTED:
-                    return $this->apiResponse('409-2', "application id {$id} has been rejected", [], 409);
-                case self::APPLICATION_CANCELED:
-                    return $this->apiResponse('409-3', "application id {$id} has been canceled", [], 409);
+            if ($leaveApplication->isPending($id) === false) {
+                return $this->apiResponse('409', "application id {$id} is not pending.", [], 409);
             }
 
             // update the application status to 3: canceled
             // 把請假單狀態設為 3: 取消
-            $leaveApplication->setStatus($id, self::APPLICATION_CANCELED, $request->input('approver'));
+            $leaveApplication->cancel($id, $request->input('approver'));
         } catch (\Throwable $e) {
             Log::error('cancel leave error, ' . $e->getMessage(), $request->input());
             return $this->apiResponse('500', "Internal service error", [], 500);
@@ -138,13 +123,8 @@ class LeaveController extends Controller
 
             // if the status of the application is not 0: pending, it should return failed
             // 如果請假單的申請狀態不是 0: 待審核，那就應該回錯誤
-            switch ($application['status']) {
-                case self::APPLICATION_APPROVED:
-                    return $this->apiResponse('409-1', "application id {$id} has been approved", [], 409);
-                case self::APPLICATION_REJECTED:
-                    return $this->apiResponse('409-2', "application id {$id} has been rejected", [], 409);
-                case self::APPLICATION_CANCELED:
-                    return $this->apiResponse('409-3', "application id {$id} has been rejected", [], 409);
+            if ($leaveApplication->isPending($id) === false) {
+                return $this->apiResponse('409', "application id {$id} is not pending.", [], 409);
             }
 
             // only the staff who after the probation can take an annual leave
@@ -155,21 +135,20 @@ class LeaveController extends Controller
                 }
             }
 
-            // get the staff's leave balance hours
-            // 取得員工的剩餘請假時數
-            $staffLeaves = $staffLeave->getBalance($application['staff']['id']);
-
             // compare balance hours to apply hours, the balance hours should be greater than apply hours
             // 剩餘的請假時數應該要比申請的時數還多
             $leaveApplyHours = $application['leave_hours'];
-            $leaveBalanceHours = $staffLeaves[$application['leave_type']];
-            if ($leaveBalanceHours < $leaveApplyHours) {
-                return $this->apiResponse('409-5', "staff {$application['staff']['name']} {$application['leave_type']} leaves is not enought", [], 409);
+            if ($staffLeave->isSufficient($application['staff']['id'], $application['leave_type'], $leaveApplyHours) === false) {
+                return $this->apiResponse(
+                    code: '409-5',
+                    message: "staff {$application['staff']['name']} {$application['leave_type']} leaves is not enough",
+                    statusCode: 409,
+                );
             }
 
             // update the application status to 1: approved
             // 把請假單狀態設為 1: 已核准
-            $setResult = $leaveApplication->setStatus($id, self::APPLICATION_APPROVED, $request->input('approver'));
+            $setResult = $leaveApplication->approve($id, $request->input('approver'));
             if ($setResult === false) {
                 return $this->apiResponse('409-6', "the status of application id {$id} has been changed", [], 409);
             }
