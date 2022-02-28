@@ -127,9 +127,9 @@ class LeaveController extends Controller
                 return $this->apiResponse('409', "application id {$id} is not pending.", [], 409);
             }
 
-            // only the staff who after the probation can take an annual leave
-            // 特休假要通過試用期的員工才能請
-            if ($application['leave_type'] === 'annual') {
+            // only the staff who after the probation can take an annual leave and sick leave
+            // 特休假和病假要通過試用期的員工才能請
+            if ($application['leave_type'] === 'annual' || $application['leave_type'] === 'sick') {
                 if ($application['staff']['is_probation'] === true) {
                     return $this->apiResponse('409-4', "staff {$application['staff']['name']} is in probation, could not take a annual leave", [], 409);
                 }
@@ -163,6 +163,21 @@ class LeaveController extends Controller
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
+            Log::error('approval leave error, ' . $e->getMessage(), $request->input());
+            return $this->apiResponse('500', "Internal service error", [], 500);
+        }
+
+        try {
+            // send a email to supervisor.
+            // 寄信給主管
+
+            // if the leave needs to pass probation
+            // 如果這個假是需要過試用期才能夠請的
+            if ($application['leave_type'] === 'annual' || $application['leave_type'] === 'sick') {
+                // send a email to manager.
+                // 還要寄信給管理者
+            }
+        } catch (\Throwable $e) {
             Log::error('approval leave error, ' . $e->getMessage(), $request->input());
             return $this->apiResponse('500', "Internal service error", [], 500);
         }
