@@ -29,4 +29,12 @@ class StaffFactory extends Factory
             'join_date' => $this->faker->dateTimeBetween('-2 years', '-100 days')->format('Y-m-d'),
         ];
     }
+
+    public function inProbationPeriod()
+    {
+        return $this->state([
+            'is_probation' => 1,
+            'join_date' => $this->faker->dateTimeBetween('-90 days', 'now')->format('Y-m-d'),
+        ]);
+    }
 }

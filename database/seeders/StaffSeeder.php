@@ -32,9 +32,8 @@ class StaffSeeder extends Seeder
         // 新增一個還在試用期，並且名字為 John 的員工
         Staff::factory([
             'name' => 'John',
-            'is_probation' => 1,
-            'join_date' => date('Y-m-d', strtotime('-60 days')),
         ])
+        ->inProbationPeriod()
         ->create();
     }
 }

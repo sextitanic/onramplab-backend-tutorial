@@ -26,4 +26,16 @@ class StaffLeaveFactory extends Factory
             'personal' => 80,
         ];
     }
+
+    public function inProbationPeriod()
+    {
+        return $this->state([
+            'year' => date('Y'),
+            'annual' => 0,
+            'sick' => 0,
+            'unpaid_sick' => 40,
+            'vaccine' => 0,
+            'personal' => 80,
+        ]);
+    }
 }
