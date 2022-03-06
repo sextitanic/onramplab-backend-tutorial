@@ -50,4 +50,61 @@ class ApplicationTest extends TestCase
         $updateNoAffectedRows = $this->application->setStatus(1, $this->status['approved'], 'test');
         $this->assertFalse($updateNoAffectedRows);
     }
+
+    /**
+     * test the approve method is worked.
+     *
+     * @return void
+     */
+    public function testApproveStatus()
+    {
+        $this->partialMockSetStatus(1);
+        $approved = app(Application::class)->approve(1, 'test');
+        $this->assertTrue($approved);
+    }
+
+    /**
+     * test the reject method is worked.
+     *
+     * @return void
+     */
+    public function testRejectStatus()
+    {
+        $this->partialMockSetStatus(2);
+        $rejected = app(Application::class)->reject(1, 'test');
+        $this->assertTrue($rejected);
+    }
+
+    /**
+     * test the cancel method is worked.
+     *
+     * @return void
+     */
+    public function testCancelStatus()
+    {
+        $this->partialMockSetStatus(3);
+        $rejected = app(Application::class)->cancel(1, 'test');
+        $this->assertTrue($rejected);
+    }
+
+    /**
+     * partial mock the setStatus method of the Application class,
+     * and validate if the status code matches.
+     *
+     * @param integer $validStatus
+     * @return void
+     */
+    protected function partialMockSetStatus(int $validStatus)
+    {
+        $this->partialMock(Application::class, function (MockInterface $callMock) use ($validStatus) {
+            $callMock
+                ->shouldReceive('setStatus')
+                ->andReturnUsing(function (int $id, int $status, string $approverName) use ($validStatus) {
+                    if ($status !== $validStatus) {
+                        return false;
+                    }
+                    return true;
+                });
+        });
+    }
 }
