@@ -107,4 +107,52 @@ class ApplicationTest extends TestCase
                 });
         });
     }
+
+    /**
+     * test all status of the application form is pending or not.
+     *
+     * @dataProvider checkIsPendingDataProvider
+     */
+    public function testIsPending(int $id, bool $expected)
+    {
+        $this->partialMockGetFormById();
+        $actual = app(Application::class)->isPending($id);
+        $this->assertEquals($expected, $actual);
+    }
+
+    /**
+     * testing data set
+     */
+    public function checkIsPendingDataProvider()
+    {
+        return [
+            [1, true],
+            [2, false],
+            [3, false],
+            [4, false],
+        ];
+    }
+
+    /**
+     * partial mock the getFormById method of the Application class.
+     *
+     * @return void
+     */
+    protected function partialMockGetFormById()
+    {
+        $testingData = [
+            1 => ['id' => 1, 'status' => $this->status['pending']],
+            2 => ['id' => 2, 'status' => $this->status['approved']],
+            3 => ['id' => 3, 'status' => $this->status['rejected']],
+            4 => ['id' => 4, 'status' => $this->status['canceled']],
+        ];
+
+        $this->partialMock(Application::class, function (MockInterface $callMock) use ($testingData) {
+            $callMock
+                ->shouldReceive('getFormById')
+                ->andReturnUsing(function (int $id) use ($testingData) {
+                    return $testingData[$id];
+                });
+        });
+    }
 }
